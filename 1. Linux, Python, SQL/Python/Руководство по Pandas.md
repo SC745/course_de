@@ -153,7 +153,45 @@ df.query('salary > 50000 + math.sqrt(age) * 1000')    # Функция math
 <h3>3. Изменение данных</h3>
 <h4>Работа с пропущеными значениями</h4>
 
+Удаление пропущенных значений:
+```python
+df.dropna()                # Удаление строк с пропущенными значениями
+df.dropna(axis=1)          # Удаление столбцов с пропущенными значениями
+df.dropna(thresh=2)        # Оставляет строки с минимум 2 не-NaN значениями
+df.dropna(subset=['A'])    # Удаляет строки, где в столбце 'A' есть NaN
+```
 
+Замена пропущенных значений:
+```python
+df.fillna(0)                      # Заполнение константой
+df['A'].fillna(df['A'].mean())    # Заполнение средним/медианой
+df.fillna(method='ffill')         # Заполнение предыдущим значением. Аналог: df.ffill()
+df.fillna(method='bfill')         # Заполнение следующим значением. Аналог: df.ffill()
+```
+
+<h4>Замена значений</h4>
+
+Метод `apply()` - применение функций к `Series` и `DataFrame`:
+```python
+df['age'].apply(lambda x: x * 2)    # Применение к столбцу
+df.apply(sum, axis=0)               # Применение ко всем столбцам
+df.apply(sum, axis=1)               # Применение ко всем строкам
+
+# Пользовательская функция
+def calculate_bonus(salary, bonus_rate=0.1, fixed_bonus=0):
+    return salary * bonus_rate + fixed_bonus
+
+# Применяем с дополнительными аргументами
+df['salary'].apply(calculate_bonus, args=(0.15, 1000))
+```
+
+Метод `map()` - замена значений в `Series`:
+```python
+df['department'].map({'Finance': 'FN'})                        # Использование словаря
+df['name'].map(str.upper)                                      # Использование функции
+df['name'].map(pd.Series(['Finance'], index = ['FN']))         # Использование Series
+df['department'].map({'Finance': 'FN'}, na_action='ignore')    # Обработка NaN
+```
 
 
 <h3>4. Изменение структуры</h3>
