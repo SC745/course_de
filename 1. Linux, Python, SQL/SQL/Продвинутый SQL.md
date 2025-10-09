@@ -38,6 +38,54 @@ SELECT @NewID as NewCustomerID;
 - OUT параметры: не передаются в процедуру (хотя синтаксис вызова может требовать указания переменной), но их значение устанавливается внутри процедуры и становится доступным вызывающей стороне.
 - INOUT параметры: комбинация — передаются в процедуру и могут быть изменены.
 
+Работа с транзакцией с помощью процедуры - жто помогает обеспечить атомарность операций внутри процедуры:
+```sql
+DELIMITER //
+
+CREATE PROCEDURE TransactionExample()
+BEGIN
+    -- Объявляем обработчик для автоматического отката при ошибках
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    START TRANSACTION;
+    UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+    UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+    COMMIT;
+END //
+
+DELIMITER ;
+```
+
+Также в хранимых процедурах можно использовать курсоры - объекты базы данных, которые позволяЮт перебирать строки результирующего набора построчно и выполнять операции над каждой строкой. В основном применяются для интеграции с внешними системами и для выполнения сложных операций. Пример:
+```sql
+DELIMITER //
+
+CREATE PROCEDURE ProcessWithCursor()
+BEGIN
+    DECLARE done BOOLEAN DEFAULT FALSE;
+    DECLARE var_id INT;
+    DECLARE var_name VARCHAR(100);
+    DECLARE var_salary DECIMAL(10,2);
+    DECLARE cur CURSOR FOR SELECT id, name, salary FROM employees WHERE department = 'IT';
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    OPEN cur;
+    read_loop: LOOP
+        FETCH cur INTO var_id, var_name, var_salary;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+        CALL ProcessEmployee(var_id, var_name, var_salary);
+    END LOOP;
+    CLOSE cur;
+END //
+
+DELIMITER ;
+```
+
 <h4>Хранимые функции</h4>
 
 Хранимая функция (Stored Function, или User-Defined Function - UDF) — это подпрограмма, которая возвращает единственное значение (скаляр) или таблицу. Ключевое отличие — функция предназначена для вычисления значения и использования его внутри SQL-выражений.
@@ -79,9 +127,7 @@ WHERE GetOrderTotalAmount(OrderID) > 1000;
 
 Детали определения:
 - `RETURNS` — указывает тип данных возвращаемого значения.
-
 - `DETERMINISTIC` / `NOT DETERMINISTIC`: Детерминированная функция всегда возвращает один и тот же результат для одних и тех же входных параметров (например, `UPPER()`). Недетерминированная — может возвращать разный результат (например, функция, использующая `CURRENT_TIMESTAMP`).
-
 - `READS SQL DATA` — указывает, что функция только читает данные. Бывают также `MODIFIES SQL DATA` и др.
 
 Сравнение с процедурой:
@@ -89,6 +135,110 @@ WHERE GetOrderTotalAmount(OrderID) > 1000;
 - Может вызываться как часть SQL выражения (В `SELECT`, `WHERE`, `HAVING` и др.)
 - Всегда возвращает одно значение, процедура может возвращать ничего или несколько значений
 - В большинстве СУБД не может выполнять DML операции
+
+Реализация рекурсии (с помощью рекурсивного CTE):
+```sql
+DELIMITER //
+
+CREATE FUNCTION CalculateFactorial(n INT)
+RETURNS INT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE result INT;
+
+    WITH RECURSIVE factorial_cte (n, fact) AS (
+        SELECT 1, 1
+        UNION ALL
+        SELECT n + 1, fact * (n + 1)
+          FROM factorial_cte
+         WHERE n < CalculateFactorial.n  -- Обращение к параметру функции
+    )
+    SELECT fact INTO result
+      FROM factorial_cte
+     ORDER BY n DESC
+    LIMIT 1;
+
+    RETURN result;
+END //
+
+DELIMITER ;
+```
+
+<h4>Триггеры</h4>
+
+Триггеры — это специальные хранимые процедуры, которые автоматически выполняются при возникновении определенных событий в таблице базы данных. Эти события могут быть связаны с операциями DML (Data Manipulation Language), такими как `INSERT`, `UPDATE`, `DELETE`, или DDL (Data Definition Language), например, создание или изменение таблиц. Они могут срабатывать до (`BEFORE`) или после (`AFTER`) события, а в некоторых СУБД (например, PostgreSQL) — вместо (`INSTEAD OF`) события.
+Триггеры часто используются для:
+- Проверки целостности данных.
+- Автоматического обновления связанных данных.
+- Логирования изменений.
+- Реализации сложных бизнес-правил.
+
+Синтаксис создания триггера:
+```sql
+CREATE TRIGGER trigger_name
+[BEFORE | AFTER | INSTEAD OF] [INSERT | UPDATE | DELETE]
+ON table_name
+[FOR EACH ROW | FOR EACH STATEMENT]
+[WHEN (condition)]
+BEGIN
+    -- Логика триггера
+END;
+```
+- BEFORE/AFTER/INSTEAD OF: Определяют момент срабатывания.
+- FOR EACH ROW: Триггер выполняется для каждой изменяемой строки.
+- FOR EACH STATEMENT: Триггер выполняется один раз для всего оператора.
+- WHEN: Условие, при котором триггер активируется.
+
+Пример (автоматическое обновление поля при обновлении данных):
+```sql
+CREATE TRIGGER update_product_timestamp
+BEFORE UPDATE ON products
+FOR EACH ROW
+BEGIN
+    NEW.last_updated = CURRENT_TIMESTAMP;
+END;
+```
+- NEW: ссылается на новую строку для операций INSERT и UPDATE. В триггерах DELETE не существует NEW.
+- OLD: ссылается на старую строку для операций UPDATE и DELETE. В триггерах INSERT не существует OLD.
+
+Триггеры могут вызвать бесконечную рекурсию, если они вызывают сами себя по цепочке. Чтобы этого избежать можно применить следующее:
+- Временное отключение триггера (если СУБД позволяет):
+```sql
+ALTER TABLE table_name DISABLE TRIGGER trigger_name;
+# Выполнение операции
+ALTER TABLE table_name ENABLE TRIGGER trigger_name;
+```
+- Использование флагов (например, через временную таблицу или переменные):
+```sql
+CREATE TRIGGER prevent_recursion
+BEFORE UPDATE ON accounts
+FOR EACH ROW
+BEGIN
+    -- Проверка флага рекурсии
+    IF @is_trigger_active IS NULL THEN
+        SET @is_trigger_active = 1;
+        -- Логика триггера
+        UPDATE accounts SET balance = NEW.balance * 1.1 WHERE id = NEW.id;
+        SET @is_trigger_active = NULL;
+    END IF;
+END;
+```
+- Ограничение рекурсии на уровне СУБД. Например, в SQL Server:
+```sql
+ALTER DATABASE database_name SET RECURSIVE_TRIGGERS OFF;
+```
+- Условия в триггере. Например, обновлять поле только если его значение действительно изменилось:
+```sql
+CREATE TRIGGER update_only_if_changed
+BEFORE UPDATE ON products
+FOR EACH ROW
+BEGIN
+    IF OLD.price <> NEW.price THEN
+        NEW.last_updated = CURRENT_TIMESTAMP;
+    END IF;
+END;
+```
 
 <h3>2. Транзакции</h3>
 
@@ -782,5 +932,4 @@ for outer_row in outer_table:
 
 Когда эффективен:
 - Когда используется система с изменяющейся нагрузкой
-- Когда требуется бытро вывести первые строки
-
+- Когда требуется быстро вывести первые строки
