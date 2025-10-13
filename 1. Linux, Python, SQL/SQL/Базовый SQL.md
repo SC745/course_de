@@ -1,5 +1,546 @@
 <h2>Базовый SQL</h2>
-<h3>1. Использование переменных</h3>
+<h3>1. Введение</h3>
+
+SQL, или язык структурированных запросов (Structured Query Language), представляет собой формальный язык, используемый для управления и взаимодействия с реляционными базами данных. SQL был разработан с целью упростить работу с данными в базах данных, обеспечивая стандартизированный способ выполнения операций, таких как запросы, вставка, обновление и удаление данных. SQL является декларативным языком, что означает, что пользователь указывает, что нужно сделать (например, какие данные извлечь), а не как это делать (как выполнить конкретный запрос). Он широко используется в различных типах приложений и является стандартом для работы с реляционными базами данных.
+
+<h4>Порядок выполнения операций</h4>
+
+Рассмотрим следующий запрос:
+```sql
+SELECT clients.first_name, clients.last_name, COUNT(0)
+  FROM clients
+       JOIN sales ON sales.id = sales.client_id
+ WHERE clients.age > 50
+ GROUP BY clients.first_name, clients.last_name
+HAVING COUNT(0) > 10
+ ORDER BY clients.first_name, clients.last_name
+```
+
+Порядок выполнения такого запроса будет выглядеть следующим образом:
+1. `FROM` (выбор таблицы)
+2. `JOIN` (комбинация с данными из другой таблицы)
+3. `WHERE` (фильтрация)
+4. `GROUP BY` (агрегирование)
+5. `HAVING` (фильтрация агрегированных данных)
+6. `SELECT` (возврат результата)
+7. `ORDER BY` (сортировка).
+
+<h3>2. Основные операторы</h3>
+
+Операторы SQL разделяют на 4 группы в зависимости от специфики проводимых операций:
+- Определения данных (Data Definition Language, DDL)
+- Манипуляции данными (Data Manipulation Language, DML)
+- Определения доступа к данным (Data Control Language, DCL)
+- Управления транзакциями (Transaction Control Language, TCL)
+
+<h4>DDL</h4>
+
+Оператор `CREATE` - создание данных:
+```sql
+CREATE TABLE employee (
+    employee_id INT PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50),
+    birthdate DATE,
+    salary DECIMAL(10, 2)
+);
+
+CREATE TABLE department (
+    department_id INT PRIMARY KEY,
+    name VARCHAR(50)
+);
+```
+
+Оператор `ALTER` - изменение данных:
+```sql
+ALTER TABLE employee ADD COLUMN department_id INT;
+ALTER TABLE employee RENAME COLUMN first_name TO name;
+ALTER TABLE employee ALTER COLUMN name TYPE VARCHAR(100);
+ALTER TABLE employee DROP COLUMN last_name;
+
+ALTER TABLE employee ADD CONSTRAINT fk_department
+FOREIGN KEY (department_id) REFERENCES department(department_id)
+ON DELETE SET NULL
+ON UPDATE CASCADE;
+```
+
+Оператор `DROP` - удаление данных:
+```sql
+DROP TABLE employee;
+DROP TABLE department;
+```
+
+<h4>DML</h4>
+
+Оператор `INSERT` - вставка данных:
+```sql
+INSERT INTO department (name)
+VALUES ('IT'), ('HR'), ('Sales');
+
+INSERT INTO employee (name, birthdate, salary, department_id)
+VALUES ('Ефим Родионов', '23-08-1986', 75000, 1),
+       ('Макар Самойлов', '15-09-1993', 115000, 1),
+       ('Вячеслав Титов', '30-11-1990', 85000, 1),
+       ('Лилия Молчанова', '07-03-1997', 55000, 2),
+       ('Дарья Смирнова', '19-05-1999', 60000, 2),
+       ('Юлиана Кузьмина', '23-08-1988', 55000, 3),
+       ('Герман Смирнов', '23-08-1989', 65000, 3),
+       ('Владислав Шаров', '23-08-1992', 95000, 3)
+```
+
+Оператор `UPDATE` - обновление данных:
+```sql
+UPDATE employee AS emp
+   SET salary = salary * 1.1
+  FROM department AS dep
+ WHERE dep.name = 'HR'
+   AND birthdate BETWEEN '01-01-1990' AND '01-01-2000'
+   AND dep.department_id = emp.department_id
+```
+
+Оператор `DELETE` - удаление данных:
+```sql
+DELETE FROM employee AS emp
+ USING department AS dep
+ WHERE dep.name = 'HR'
+   AND dep.department_id = emp.department_id
+```
+
+Оператор `SELECT` - выбор данных:
+```sql
+SELECT emp.name,
+       emp.salary,
+       dep.name
+  FROM employee AS emp
+       JOIN (SELECT department_id,
+                    max(salary) AS salary
+               FROM employee
+              GROUP BY department_id
+             HAVING max(salary) > 70000) AS max_salaries
+         ON emp.department_id = max_salaries.department_id
+        AND emp.salary = max_salaries.salary
+       JOIN department AS dep
+         ON dep.department_id = emp.department_id
+ WHERE dep.name <> 'HR'
+ ORDER BY salary DESC, name ASC
+ LIMIT 3
+```
+
+<h4>DCL</h4>
+
+DCL включает команды для управления правами доступа к данным и структурам базы данных. Разделяют различные уровни доступа, типы прав и сущности, которым могут предоставляться права. Основными операторами являются `GRANT` (предоставление прав), `REVOKE` (отзыв прав) и `DENY` (явный запрет):
+```sql
+GRANT privilege_name ON object TO user_or_role;
+REVOKE privilege_name ON object FROM user_or_role;
+DENY privilege_name ON object TO user_or_role;
+```
+
+Пользователи и роли:
+```sql
+-- Операции с пользователем
+CREATE USER auditor WITH PASSWORD 'audit123';
+ALTER USER developer WITH PASSWORD 'new_pass';
+DROP USER temp_user;
+
+-- Создание ролей
+CREATE ROLE read_only_role;
+CREATE ROLE hr_manager_role;
+CREATE ROLE data_analyst_role;
+
+-- Назначение ролей пользователям
+GRANT read_only_role TO john_doe;
+GRANT hr_manager_role, data_analyst_role TO jane_smith;
+```
+
+Возможные типы прав:
+- `SELECT`: чтение данных
+- `INSERT`: вставка новых данных
+- `UPDATE`: обновление данных (может быть ограничено столбцами)
+- `DELETE`: удаление данных
+- `REFERENCES`: возможность создавать внешние ключи на таблицу
+- `TRIGGER`: возможность создавать триггеры на таблице
+- `CREATE`, CONNECT, TEMP: на уровне базы данных/схемы
+- `USAGE`: на использование последовательностей, доменов, схем и т.д.
+- `ALL`: все права
+
+Уровни доступа:
+1. Уровень базы данных
+```sql
+GRANT CONNECT ON DATABASE company_db TO app_user;
+GRANT CREATE ON DATABASE company_db TO developer;
+```
+2. Уровень схемы
+```sql
+GRANT USAGE ON SCHEMA public TO user1;
+GRANT CREATE ON SCHEMA hr_schema TO hr_manager;
+```
+3. Уровень таблицы
+```sql
+GRANT SELECT, INSERT ON employees TO manager;
+GRANT ALL PRIVILEGES ON departments TO admin;
+```
+4. Уровень столбца
+```sql
+GRANT SELECT (id, name, email) ON employees TO support;
+GRANT UPDATE (phone, address) ON customers TO operator;
+```
+5. Уровень строки (через RLS - Row Level Security)
+```sql
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY user_orders_policy ON orders
+FOR ALL USING (user_id = current_user_id());
+```
+
+<h4>TCL</h4>
+
+Операторы:
+- `COMMIT` - подтверждение транзакции
+- `ROLLBACK` - откат транзакции
+- `SAVEPOINT` - точка сохранения
+- `SET TRANSACTION` - настройка транзакции
+
+
+```sql
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+BEGIN;
+INSERT INTO department (name) VALUES ('Accounting');
+SAVEPOINT dep_created;
+UPDATE employee SET department_id = 4 WHERE id = 1;
+COMMIT;
+```
+
+<h3>3. Работа со множествами</h3>
+
+В SQL есть возможность применять операции работы со множествами для запросов, результаты которых имеют одинаковый набор столбцов. Для примеров будут использоваться запросы типа `SELECT UNNEST(ARRAY[...]) AS col`, позволяющие выбирать значения в виде столбца (PostgreSQL).
+
+<h4>UNION [ALL]</h4>
+
+Позволяет объединять результаты запросов, оставляя уникальные значения:
+```sql
+SELECT UNNEST(ARRAY[1,1,1,3,4]) AS col
+UNION
+SELECT UNNEST(ARRAY[1,1,2,3]) AS col
+ORDER BY col
+-- [1,2,3,4]
+```
+
+При добавлении `ALL` предотвращает удаление дубликатов:
+```sql
+SELECT UNNEST(ARRAY[1,1,1,3,4]) AS col
+UNION ALL
+SELECT UNNEST(ARRAY[1,1,2,3]) AS col
+ORDER BY col
+-- [1,1,1,1,1,2,3,3,4]
+```
+
+<h4>EXCEPT [ALL]</h4>
+
+Удаляет все значения второго запроса из первого запроса:
+```sql
+SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+EXCEPT
+SELECT UNNEST(ARRAY[1,1,2,3]) as col
+ORDER BY col
+-- [4]
+```
+
+При добавлении `ALL` удаляет не все значения, а то количество, которое есть во втором запросе:
+```sql
+SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+EXCEPT ALL
+SELECT UNNEST(ARRAY[1,1,2,3]) as col
+ORDER BY col
+-- [1,4]
+```
+
+<h4>INTERSECT [ALL]</h4>
+
+Возвращает те значения, которые есть в обоих запросах:
+```sql
+SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+INTERSECT
+SELECT UNNEST(ARRAY[1,1,2,3]) as col
+ORDER BY col
+-- [1,3]
+```
+
+При добавлении `ALL` возвращает значения с учетом их количества в обоих запросах:
+```sql
+SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+INTERSECT ALL
+SELECT UNNEST(ARRAY[1,1,2,3]) as col
+ORDER BY col
+-- [1,1,3]
+```
+
+`INTERSECT` является более приоритетной операцией, чем `UNION` и `EXCEPT`:
+```sql
+SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+union
+SELECT UNNEST(ARRAY[1,1,2,3]) as col
+intersect
+SELECT UNNEST(ARRAY[1,1,1,3]) as col
+ORDER BY col
+-- [1,3,4], а не [1,3]
+```
+
+Для задания явной последовательности операций можно использовать скобки.
+
+<h3>4. Соединения таблиц</h3>
+
+Соединения используются для объединения строк из двух или более таблиц на основе определенного условия.
+
+<h4>INNER JOIN</h4>
+
+Возвращает только те строки, для которых условие выполняется.
+```sql
+SELECT emp.name, dep.name
+  FROM employee AS emp
+       INNER JOIN department AS dep
+       ON emp.department_id = dep.department_id
+```
+
+<h4>LEFT JOIN</h4>
+
+Возвращает все строки из левой таблицы и только те строки из правой, для которых условие выполняется.
+```sql
+SELECT emp.name, dep.name
+  FROM employee AS emp
+       LEFT JOIN department AS dep
+       ON emp.department_id = dep.department_id
+```
+
+<h4>RIGHT JOIN</h4>
+
+Возвращает все строки из правой таблицы и только те строки из левой, для которых условие выполняется.
+```sql
+SELECT emp.name, dep.name
+  FROM department AS dep
+       RIGHT JOIN employee AS emp
+       ON emp.department_id = dep.department_id
+```
+
+<h4>FULL JOIN</h4>
+
+Возвращает все строки из обеих таблиц. Если есть совпадение, то строки объединяются, если нет, то недостающие части заполняются `NULL`.
+```sql
+SELECT emp.name, dep.name
+  FROM employee AS emp
+       FULL JOIN department AS dep
+       ON emp.department_id = dep.department_id
+```
+
+<h4>CROSS JOIN</h4>
+
+Возвращает все возможные комбинации строк двух таблиц.
+```sql
+SELECT emp.name, dep.name
+  FROM employee AS emp
+       CROSS JOIN department AS dep
+```
+
+<h4>Специальные возможности</h4>
+
+Использование `USING` для соединения таблиц, в которых столбцы, участвующие в условии, имеют одинаковые названия и условием является равенство:
+```sql
+SELECT employee.name, department.name
+  FROM employee
+       JOIN department USING (department_id)
+```
+
+Также в таких случаях можно использовать `NATURAL JOIN`:
+```sql
+SELECT employee.name, department.name
+  FROM employee
+       NATURAL JOIN department
+```
+
+`SELF JOIN` - соединение таблицы с самой собой:
+```sql
+SELECT t1.name, t2.name
+  FROM employee AS t1
+       JOIN employee AS t2
+       ON t1.employee_id = t2.employee_id + 1
+```
+
+<h3>5. Подзапросы</h3>
+
+Подзапрос - это запрос, вложенный в другой запрос. Подзапросы могут использоваться в различных частях основного запроса и решают широкий спектр задач.
+
+Классификация подзапросов:
+- По количеству возвращаемых строк и столбцов:
+  - Скалярные (одна строка, один столбец)
+  - Векторные (много строк, один столбец)
+  - Табличные (много строк, много столбцов)
+- По зависимости от внешнего запроса:
+  - Независимые (некоррелированные) — выполняются один раз
+  - Зависимые (коррелированные) — выполняются для каждой строки внешнего запроса
+- По месту использования:
+  - В `SELECT` (скалярные подзапросы)
+  - В `FROM` (все типы)
+  - В `WHERE` (скалярные и векторные)
+  - В `HAVING` (скалярные и векторные)
+
+Подзапрос в `SELECT`:
+```sql
+SELECT name,
+       salary,
+       salary - (SELECT AVG(salary) FROM employee) as diff_from_avg
+  FROM employee;
+```
+
+Подзапрос в `FROM`:
+```sql
+SELECT dept_stats.name,
+       dept_stats.avg_salary
+  FROM (SELECT department.name,
+               AVG(salary) as avg_salary
+          FROM employee
+               JOIN department USING (department_id)
+         GROUP BY department.name) AS dept_stats
+WHERE dept_stats.avg_salary > 50000;
+```
+
+Подзапрос в `WHERE` (аналогично с `HAVING`):
+
+```sql
+-- Использование IN
+SELECT name
+  FROM employee
+ WHERE department_id IN
+       (SELECT department_id
+          FROM department
+         WHERE budget > 100000);
+
+-- Аналог с EXISTS
+SELECT name
+  FROM employee AS emp
+ WHERE EXISTS
+       (SELECT 0
+          FROM department AS dep
+         WHERE budget > 100000
+           AND emp.department_id = dep.department_id);
+```
+
+<h4>ANY</h4>
+
+Оператор `ANY` возвращает `TRUE`, если условие выполняется хотя бы для одного значения возвращенного подзапросом. Можно также использовать его синоним `SOME`, однако чаще в запросах используют все же первый вариант оператора.
+- значение >= `ANY` (подзапрос) возвращает `TRUE` если значение левого операнда больше либо равно минимальному значению, возвращаемому подзапросом правого операнда.
+- значение = `ANY` (подзапрос) возвращает `TRUE` если значение левого операнда равно хотя бы одному из значений, возвращаемому подзапросом правого операнда.
+- значение <= `ANY` (подзапрос) возвращает `TRUE` если значение левого операнда меньше либо равно максимальному значению, возвращаемому подзапросом правого операнда.
+- значение != `ANY` (подзапрос) возвращает `TRUE` если значение левого операнда не равно ни одному из значений, возвращаемому подзапросом правого операнда.
+
+```sql
+SELECT name
+  FROM employee
+ WHERE salary >= ANY
+       (SELECT salary
+          FROM employee
+               JOIN department USING (department_id)
+         WHERE department.name = 'HR')
+```
+
+<h4>ALL</h4>
+
+Оператор `ALL` возвращает `TRUE`, если условие выполняется для всех значений возвращенных подзапросом.
+- значение >= `ALL` (подзапрос) - возвращает `TRUE` если значение левого операнда больше либо равно максимальному значению, возвращаемому подзапросом правого операнда.
+- значение = `ALL` (подзапрос) - возвращает `TRUE` если значение левого операнда равно каждому значению, возвращаемого подзапросом правого операнда.
+- значение <= `ALL` (подзапрос) - возвращает `TRUE` если значение левого операнда меньше либо равно минимальному значению, возвращаемому подзапросом правого операнда.
+- значение != `ALL` (подзапрос) - возвращает `TRUE` если значение левого операнда не равно ни одному из значений, возвращаемому подзапросом правого операнда.
+
+```sql
+SELECT name
+  FROM employee
+ WHERE salary >= ALL
+       (SELECT salary
+          FROM employee
+               JOIN department USING (department_id)
+         WHERE department.name = 'HR')
+```
+
+<h3>6. Основные функции</h3>
+
+<h4>Проверка на NULL</h4>
+
+Осуществляется с помощью ключевого слова `IS`:
+```sql
+SELECT name, department_id
+  FROM employee
+ WHERE department_id IS NULL
+```
+
+Для подстановки значений вместо NULL используется функция `COALESCE`:
+```sql
+SELECT name, COALESCE(department_id, 'Не определен') AS department_id
+  FROM employee
+ WHERE department_id IS NULL
+```
+
+
+<h3>7. Табличные выражения</h3>
+
+CTE (Common Table Expression) - это временный результат запроса, который можно использовать в пределах выполнения одного SQL-запроса (`SELECT`, `INSERT`, `UPDATE`, `DELETE`). CTE определяется с помощью ключевого слова `WITH`:
+```sql
+WITH Sales_CTE (SalesPerson, SalesAmount) AS (
+    SELECT SalesPerson, SUM(SalesAmount)
+    FROM Sales
+    GROUP BY SalesPerson
+)
+SELECT * FROM Sales_CTE WHERE SalesAmount > 1000;
+```
+
+<h4>Продвинутое использование CTE</h4>
+
+Можно определить несколько CTE, объявляя их через запятую после `WITH`. Эти CTE могут взаимодействовать друг с другом в блоке `WITH` как обычные таблицы, главное определить их в правильном порядке. C CTE можно выполнять все те же действия в команде `SELECT`, что и с обычными таблицами. Например, поэтапная фильтрация:
+```sql
+WITH Customers_CTE AS (
+    SELECT CustomerID, Country
+    FROM Customers
+    WHERE Country = 'USA'
+),
+Orders_CTE AS (
+    SELECT OrderID, CustomerID, OrderDate
+    FROM Orders
+    WHERE CustomerID IN (SELECT CustomerID FROM Customers_CTE)
+)
+-- Итоговый запрос
+SELECT * FROM Orders_CTE WHERE OrderDate >= '2023-01-01';
+```
+
+Также в CTE удобно применять оконные функции, а затем фильтровать в основном запросе (или в другом CTE):
+```sql
+WITH cte AS (
+    SELECT orderid,
+           orderdate,
+           val,
+           RANK() OVER(ORDER BY val DESC) AS rnk
+      FROM Orders
+)
+SELECT * FROM cte WHERE rnk <= 5
+```
+
+<h4>Рекурсивные CTE</h4>
+
+CTE также могут быть рекурсивными и использоваться для обхода иерархических структур. Рекурсивные CTE определяются с помощью ключевого слова `RECURSIVE` и их запрос состоит из двух частей:
+- Якорная часть (Anchor): начальный набор данных.
+- Рекурсивная часть (Recursive Member): часть, которая ссылается на саму CTE, чтобы добавить следующие уровни.
+
+Пример (определение уровня глубины иерархии в компании для каждого сотрудника):
+```sql
+WITH RECURSIVE EmployeeHierarchy AS (
+    SELECT EmployeeID, ManagerID, EmployeeName, 0 AS Level            -- Якорь
+      FROM Employees
+     WHERE ManagerID IS NULL
+    UNION ALL
+    SELECT e.EmployeeID, e.ManagerID, e.EmployeeName, eh.Level + 1    -- Рекурсия
+      FROM Employees AS e
+           JOIN EmployeeHierarchy eh ON e.ManagerID = eh.EmployeeID
+)
+SELECT * FROM EmployeeHierarchy;
+```
+
+<h3>8. Использование переменных</h3>
 
 Переменные в SQL могут хранить значение или набор значений (результат подзапроса). Они объявляются следующим образом (MySQL):
 ```sql
@@ -31,11 +572,7 @@ cursor.execute("INSERT INTO users (name, age) VALUES (%s, %s)", (name, age))
 
 # Именованные переменные
 data = {"name": "Alice", "age": 30}
-cursor.execute(
-    "INSERT INTO users (name, age) VALUES (%(name)s, %(age)s)",
-    data
-)
-
+cursor.execute("INSERT INTO users (name, age) VALUES (%(name)s, %(age)s)", data)
 conn.commit()
 ```
 
@@ -55,7 +592,7 @@ cursor.execute("SELECT * FROM users WHERE id IN %s", (tuple(ids),))
 cursor.execute("SELECT * FROM users WHERE id = ANY(%s)", (ids,))
 ```
 
-<h3>2. MERGE, REPLACE, UPSERT</h3>
+<h3>9. MERGE, REPLACE, UPSERT</h3>
 
 <h4>MERGE</h4>
 
@@ -194,69 +731,7 @@ WHERE users.last_login < EXCLUDED.last_login;
 - `DO NOTHING` когда обновление не требуется
 - `RETURNING` для получения информации о результате операции
 
-<h3>3. Табличные выражения</h3>
-
-CTE (Common Table Expression) - это временный результат запроса, который можно использовать в пределах выполнения одного SQL-запроса (`SELECT`, `INSERT`, `UPDATE`, `DELETE`). CTE определяется с помощью ключевого слова `WITH`:
-```sql
-WITH Sales_CTE (SalesPerson, SalesAmount) AS (
-    SELECT SalesPerson, SUM(SalesAmount)
-    FROM Sales
-    GROUP BY SalesPerson
-)
-SELECT * FROM Sales_CTE WHERE SalesAmount > 1000;
-```
-
-<h4>Продвинутое использование CTE</h4>
-
-Можно определить несколько CTE, объявляя их через запятую после `WITH`. Эти CTE могут взаимодействовать друг с другом в блоке `WITH` как обычные таблицы, главное определить их в правильном порядке. C CTE можно выполнять все те же действия в команде `SELECT`, что и с обычными таблицами. Например, поэтапная фильтрация:
-```sql
-WITH Customers_CTE AS (
-    SELECT CustomerID, Country
-    FROM Customers
-    WHERE Country = 'USA'
-),
-Orders_CTE AS (
-    SELECT OrderID, CustomerID, OrderDate
-    FROM Orders
-    WHERE CustomerID IN (SELECT CustomerID FROM Customers_CTE)
-)
--- Итоговый запрос
-SELECT * FROM Orders_CTE WHERE OrderDate >= '2023-01-01';
-```
-
-Также в CTE удобно применять оконные функции, а затем фильтровать в основном запросе (или в другом CTE):
-```sql
-WITH cte AS (
-    SELECT orderid,
-           orderdate,
-           val,
-           RANK() OVER(ORDER BY val DESC) AS rnk
-      FROM Orders
-)
-SELECT * FROM cte WHERE rnk <= 5
-```
-
-<h4>Рекурсивные CTE</h4>
-
-CTE также могут быть рекурсивными и использоваться для обхода иерархических структур. Рекурсивные CTE определяются с помощью ключевого слова `RECURSIVE` и их запрос состоит из двух частей:
-- Якорная часть (Anchor): начальный набор данных.
-- Рекурсивная часть (Recursive Member): часть, которая ссылается на саму CTE, чтобы добавить следующие уровни.
-
-Пример (определение уровня глубины иерархии в компании для каждого сотрудника):
-```sql
-WITH RECURSIVE EmployeeHierarchy AS (
-    SELECT EmployeeID, ManagerID, EmployeeName, 0 AS Level            -- Якорь
-      FROM Employees
-     WHERE ManagerID IS NULL
-    UNION ALL
-    SELECT e.EmployeeID, e.ManagerID, e.EmployeeName, eh.Level + 1    -- Рекурсия
-      FROM Employees AS e
-           JOIN EmployeeHierarchy eh ON e.ManagerID = eh.EmployeeID
-)
-SELECT * FROM EmployeeHierarchy;
-```
-
-<h3>4. Оконные функции</h3>
+<h3>10. Оконные функции</h3>
 
 Оконные функции в SQL позволяют выполнять вычисления в рамках окон (наборов строк, выбранных по определенному принципу), которые каким-то образом связаны с текущей строкой. В отличие от агрегатных функций, которые группируют строки и возвращают один результат на группу, оконные функции не приводят к свертыванию строк в одну. Они сохраняют все строки и добавляют новое вычисленное значение для каждой строки. Также они выполняются в последнюю очередь, а по результату оконной функции нельзя фильтровать в этом же запросе.
 
