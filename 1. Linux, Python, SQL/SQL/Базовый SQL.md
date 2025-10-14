@@ -461,9 +461,9 @@ SELECT name
 
 <h3>6. Основные функции</h3>
 
-<h4>Проверка на NULL</h4>
+<h4>Работа с NULL</h4>
 
-Осуществляется с помощью ключевого слова `IS`:
+Проверка осуществляется с помощью ключевого слова `IS`:
 ```sql
 SELECT name, department_id
   FROM employee
@@ -477,6 +477,140 @@ SELECT name, COALESCE(department_id, 'Не определен') AS department_id
  WHERE department_id IS NULL
 ```
 
+Агрегатные функции обрабатывают `NULL` по разному:
+- `COUNT` - `COUNT(col)` инорирует `NULL`, `COUNT(*)` считает `NULL`
+- `MIN`, `MAX`, `AVG`, `SUM` - игнорируют `NULL`
+- `GROUP BY` - формирует новую группу с `NULL`
+
+<h4>LIKE и RLIKE</h4>
+
+LIKE используется для поиска строки по шаблону:
+- `_` - один символ
+- `%` - последовательность символов
+
+```sql
+SELECT name
+  FROM department
+ WHERE name LIKE '_a%' -- Sales
+```
+
+RLIKE используется для поиска строки по регулярному выражению. Синтаксис регулярных выражений:
+- Специальные символы:
+  - `^` - Начало строки (`'^A'` - начинается с `A`)
+  - `$` - Конец строки (`'com$'` - заканчивается на `com`)
+  - `.` - Любой символ (`'^A.*'` - начинается с `A`, затем любые символы)
+  - `*` - 0 или более повторений (`'ab*c'` - `ac`, `abc`, `abbc`, `abbbc`)
+  - `+` - 1 или более повторений (`'ab+c'` - `abc`, `abbc`, `abbbc` (не `ac`))
+  - `?` - 0 или 1 повторение (`'colou?r'` - `color`, `colour`)
+  - `{n}` - Точное количество (`'a{3}'` - `aaa`)
+  - `{n,}` - n или более (`'a{2,}'` - `aa`, `aaa`, `aaaa`)
+  - `{n,m}` - От n до m (`'a{2,4}'` - `aa`, `aaa`, `aaaa`)
+- Классы символов:
+  - `[abc]` - Любой из `a`, `b`, `c` (`'[aeiou]'` - любая гласная)
+  - `[a-z]` - Любая строчная буква (`'[a-z]+'` - слово из строчных букв)
+  - `[A-Z]` - Любая заглавная буква (`'^[A-Z]'` - начинается с заглавной)
+  - `[0-9]` - Любая цифра (`'[0-9]{3}'` - три цифры подряд)
+  - `[^abc]` - Любой символ, кроме `a`, `b`, `c` (`'[^0-9]'` - не цифра)
+  - `\d` - Цифра (`'\d+'` - одна или более цифр)
+  - `\D` - Не цифра (`'\D+'` - один или более не-цифр)
+  - `\w` - Буква, цифра или `_` (`'\w+'` - слово)
+  - `\W` - Не буква, не цифра, не `_` (`'\W'` - символ не слова)
+  - `\s` - Пробельный символ (`'\s+'` - пробелы)
+  - `\S` - Не пробельный символ (`'\S+'` - непробельные символы)
+  - `\b` - Граница слова (`'\\bword\\b'` - отдельное слово)
+
+```sql
+-- Имена, содержащие 'john' или 'jane'
+SELECT first_name 
+FROM employees 
+WHERE first_name RLIKE 'john|jane';
+
+-- Номера телефонов в форматах: 123-456-7890 или (123) 456-7890
+SELECT phone 
+FROM contacts 
+WHERE phone RLIKE '^[0-9]{3}-[0-9]{3}-[0-9]{4}$|^\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}$';
+```
+
+<h4>CASE WHEN и IF</h4>
+
+Условные конструкции `CASE WHEN` и `IF` позволяют выполнять различную логику в зависимости от условий прямо в SQL запросах.
+
+```sql
+-- Базовый синтаксис
+CASE
+    WHEN condition1 THEN result1
+    WHEN condition2 THEN result2
+    ...
+    ELSE default_result
+END
+
+-- Простая форма
+CASE expression
+    WHEN value1 THEN result1
+    WHEN value2 THEN result2
+    ...
+    ELSE default_result
+END
+
+-- IF
+IF(condition, value_if_true, value_if_false)
+```
+
+<h4>Работа со строками</h4>
+
+- Конкатенация:
+  - `CONCAT(str1, str2)` - конкатенация
+  - `CONCAT_WS(del, str1, str2)` - конкатенация с разделителем
+  - `REPEAT(str, num)` - конкатенация `str` `num` раз
+  - `GROUP_CONCAT(col)` - конкатенация с разделителем по группе
+- Получение подстроки:
+  - `LEFT(str, num)` - подстрока слева длиной `num`
+  - `RIGHT(str, num)` - подстрока справа длиной `num`
+  - `SUBSTRING(start, end)` - подстрока по индексам
+- Удаление пробелов:
+  - `TRIM(BOTH|LEADING|TRAILING chr FROM str)` - удаление символов по условию
+  - `LTRIM(str)` - удаление пробелов слева
+  - `RTRIM(str)` - удаление пробелов справа
+- Изменение регистра:
+  - `UPPER(str)` - верхний регистр
+  - `LOWER(str)` - нижний регистр
+  - `INITCAP(str)` - первая буква заглавная
+- Заполнение символами:
+  - `LPAD(str, num, chr)` - дополнение `str` до длины `num` символами `chr` слева
+  - `RPAD(str, num, chr)` - дополнение `str` до длины `num` символами `chr` справа
+- Специальные:
+  - `LENGTH(str)` - длина строки
+  - `LOCATE(chr, str, num)` - поиск `chr` в `str` с позиции `num`
+  - `REPLACE(str, substr1, substr2)` - замена `substr1` на `substr2` в `str`
+  - `REVERSE(str)` - обратный порядок
+
+<h4>Работа с датами</h4>
+
+- Получение текущей даты и времени:
+  - `CURRENT_TIMESTAMP` - текущая дата и время
+  - `CURRENT_DATE` - текущая дата
+  - `CURRENT_TIME` - текущее время
+- Получение элементов даты:
+  - `YEAR(date)` - год
+  - `MONTH(date)` - месяц
+  - `DAY(date)` - день месяца
+  - `HOUR(time)` - час
+  - `MINUTE(time)` - минута
+  - `SECOND(time)` - секунда
+  - `DAYOFWEEK(date)` - день недели
+  - `WEEK(date)` - неделя года
+  - `QUARTER(date)` - квартал
+  - `EXTRACT(unit FROM DATE|TIMESTAMP date|timestamp)` - извлечь `unit` (`YEAR`,`MONTH`...) из `date` или `timestamp`
+- Операции с датами:
+  - `DATE_ADD(date, INTERVAL num unit)` - прибавить к дате `num` единиц времени `unit` (`YEAR`,`MONTH`...)
+  - `DATE_SUB(date, INTERVAL num unit)` - отнять от даты `num` единиц времени `unit` (`YEAR`,`MONTH`...)
+  - `DATEDIFF(date2, date1)` = разница в днях между датами
+  - `TIMESTAMPDIFF(unit, timestamp1, timestamp2)` - разница в `unit` между датами и временем
+- Работа с временными зонами:
+  - `UTC_TIMESTAMP()` - текущая дата и время в UTC
+  - `UTC_DATE()` - текущая дата в UTC
+  - `UTC_TIME()` - текущее время в UTC
+  - `CONVERT_TZ(timestamp, tz_str1, tz_str2)` - изменить временную зону (`tz_str`:`'+00:00'`)
 
 <h3>7. Табличные выражения</h3>
 
