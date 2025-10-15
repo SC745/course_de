@@ -277,9 +277,9 @@ ORDER BY col
 `INTERSECT` является более приоритетной операцией, чем `UNION` и `EXCEPT`:
 ```sql
 SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
-union
+UNION
 SELECT UNNEST(ARRAY[1,1,2,3]) as col
-intersect
+INTERSECT
 SELECT UNNEST(ARRAY[1,1,1,3]) as col
 ORDER BY col
 -- [1,3,4], а не [1,3]
