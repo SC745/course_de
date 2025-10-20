@@ -238,18 +238,18 @@ ORDER BY col
 
 Удаляет все значения второго запроса из первого запроса:
 ```sql
-SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+SELECT UNNEST(ARRAY[1,1,1,3,4]) AS col
 EXCEPT
-SELECT UNNEST(ARRAY[1,1,2,3]) as col
+SELECT UNNEST(ARRAY[1,1,2,3]) AS col
 ORDER BY col
 -- [4]
 ```
 
 При добавлении `ALL` удаляет не все значения, а то количество, которое есть во втором запросе:
 ```sql
-SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+SELECT UNNEST(ARRAY[1,1,1,3,4]) AS col
 EXCEPT ALL
-SELECT UNNEST(ARRAY[1,1,2,3]) as col
+SELECT UNNEST(ARRAY[1,1,2,3]) AS col
 ORDER BY col
 -- [1,4]
 ```
@@ -258,29 +258,29 @@ ORDER BY col
 
 Возвращает те значения, которые есть в обоих запросах:
 ```sql
-SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+SELECT UNNEST(ARRAY[1,1,1,3,4]) AS col
 INTERSECT
-SELECT UNNEST(ARRAY[1,1,2,3]) as col
+SELECT UNNEST(ARRAY[1,1,2,3]) AS col
 ORDER BY col
 -- [1,3]
 ```
 
 При добавлении `ALL` возвращает значения с учетом их количества в обоих запросах:
 ```sql
-SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+SELECT UNNEST(ARRAY[1,1,1,3,4]) AS col
 INTERSECT ALL
-SELECT UNNEST(ARRAY[1,1,2,3]) as col
+SELECT UNNEST(ARRAY[1,1,2,3]) AS col
 ORDER BY col
 -- [1,1,3]
 ```
 
 `INTERSECT` является более приоритетной операцией, чем `UNION` и `EXCEPT`:
 ```sql
-SELECT UNNEST(ARRAY[1,1,1,3,4]) as col
+SELECT UNNEST(ARRAY[1,1,1,3,4]) AS col
 UNION
-SELECT UNNEST(ARRAY[1,1,2,3]) as col
+SELECT UNNEST(ARRAY[1,1,2,3]) AS col
 INTERSECT
-SELECT UNNEST(ARRAY[1,1,1,3]) as col
+SELECT UNNEST(ARRAY[1,1,1,3]) AS col
 ORDER BY col
 -- [1,3,4], а не [1,3]
 ```
